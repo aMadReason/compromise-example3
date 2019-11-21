@@ -1,10 +1,11 @@
 import nlp from "compromise";
 
-const types = {
-  simple: "#ParserSimple", // mix paint 'basic'
-  complex: "#ParserComplex", // mix red paint and blue paint (explicit)
-  implicit: "#ParserComplexImplicit" // mix red and blue paint (both are paint but one is implicit)
-};
+// most restrictive first
+const types = [
+  "#ParserComplexImplicit", // mix red and blue paint (both are paint but one is implicit)
+  "#ParserComplex", // mix red paint and blue paint (explicit)
+  "#ParserSimple" // mix paint 'basic'
+];
 
 const plugin = {
   words: {
@@ -16,11 +17,11 @@ const plugin = {
     "(#Conjunction|above|adjacent|beside|under|over|above|on|over|in|inside)":
       "#Join",
     "(north|east|south|west|left|right|up|down)": "#Direction",
-    "#Verb (#Determiner|#Preposition)? #Adjective+? #Noun": "#ParserSimple",
-    "#Verb (#Determiner|#Preposition)? #Adjective+? #Noun #Join (#Determiner|#Preposition)? #Adjective+? #Noun":
-      "#ParserComplex",
     "#Verb (#Determiner|#Preposition)? #Adjective+ (with|using|on|using|and) (#Determiner|#Preposition)? #Adjective #Noun$":
-      "#ParserComplexImplicit"
+      "#ParserComplexImplicit",
+    "#Verb (#Determiner|#Preposition)? #Adjective+? #Noun #Join? (#Determiner|#Preposition)? #Adjective+? #Noun":
+      "#ParserComplex",
+    "#Verb (#Determiner|#Preposition)? #Adjective+? #Noun": "#ParserSimple"
   }
 };
 
@@ -31,32 +32,21 @@ export default function commandParser(input) {
     .clone()
     .normalize();
 
-  const typeKey = Object.keys(types).find(t => doc.has(types[t] && types[t]));
-  const type = types[typeKey];
-
-  console.log(type);
+  const type = types.find(i => doc.has(i) && i);
 
   // Get output
-  const tags = doc.normalize().out("tags");
+  const tags = doc.out("tags");
   const verbs = doc
-    .normalize()
     .match("#Verb")
     .not("(#Join")
     .out("array");
-  const nouns = doc
-    .normalize()
-    .match("#Noun")
-    .out("array");
+  const nouns = doc.match("#Noun").out("array");
   let described = doc
-    .normalize()
     .not("#Direction")
     .not("#Join")
     .match("#Adjective+ #Noun")
     .out("array"); // unable to filter valid
-  const joins = doc
-    .normalize()
-    .match("#Join")
-    .out("array");
+  const joins = doc.match("#Join").out("array");
 
   // additionals
   const infinitives = verbs.map(
@@ -75,7 +65,7 @@ export default function commandParser(input) {
     .out("array");
   const directions = doc.match("#Direction").out("array");
 
-  if (type === types.implicit && nouns.length > 0) {
+  if (type === types[0] && nouns.length > 0) {
     adjectives.map(a => {
       const describedAd = a + " " + nouns[0];
       if (described.includes(describedAd)) return undefined; // prevent dupes
